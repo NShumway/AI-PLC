@@ -1,6 +1,11 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import dotenv from 'dotenv';
+import path from 'path';
 import pool from './database';
+
+// Load .env from root directory
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 passport.use(
   new GoogleStrategy(

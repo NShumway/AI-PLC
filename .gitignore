@@ -57,6 +57,9 @@ uploads/
 .aws/
 .aws/credentials
 .aws/config
+*-trust-policy.json
+*-config.json
+s3-policy.json
 
 # Python (if using Python for PDF processing)
 __pycache__/

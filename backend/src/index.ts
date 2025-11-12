@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
+import path from 'path';
 import pool from './config/database';
 
 // Import routes
@@ -13,8 +14,8 @@ import authRoutes from './routes/auth';
 import chatRoutes from './routes/chat';
 import adminRoutes from './routes/admin';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from root directory
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
