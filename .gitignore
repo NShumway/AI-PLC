@@ -27,6 +27,10 @@ out/
 *~
 .DS_Store
 
+# Claude Code
+.claude/
+.claudeignore
+
 # Logs
 logs/
 *.log
