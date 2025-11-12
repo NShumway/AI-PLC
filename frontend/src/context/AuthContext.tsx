@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import axios from 'axios';
+import axios from '../config/api';
 
 interface User {
   id: string;
@@ -37,7 +37,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = () => {
     // Redirect to backend OAuth endpoint
-    window.location.href = '/auth/google';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    window.location.href = `${API_URL}/auth/google`;
   };
 
   const logout = async () => {
