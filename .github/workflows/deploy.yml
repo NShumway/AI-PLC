@@ -49,7 +49,12 @@ jobs:
         run: |
           aws apprunner update-service \
             --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} \
-            --source-configuration ImageRepository={ImageIdentifier=${{ steps.build-image.outputs.image }},ImageRepositoryType=ECR} \
+            --source-configuration "{
+              \"ImageRepository\": {
+                \"ImageIdentifier\": \"${{ steps.build-image.outputs.image }}\",
+                \"ImageRepositoryType\": \"ECR\"
+              }
+            }" \
             --region ${{ env.AWS_REGION }}
 
   deploy-frontend:
