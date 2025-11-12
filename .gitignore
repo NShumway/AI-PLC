@@ -55,8 +55,8 @@ uploads/
 
 # AWS and secrets
 .aws/
-credentials
-config
+.aws/credentials
+.aws/config
 
 # Python (if using Python for PDF processing)
 __pycache__/
