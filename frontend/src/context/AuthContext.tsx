@@ -23,14 +23,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check authentication status on mount
+    console.log('[AuthContext] Checking authentication...');
     axios.get('/auth/me', { withCredentials: true })
       .then(response => {
+        console.log('[AuthContext] User authenticated:', response.data);
         setUser(response.data);
       })
-      .catch(() => {
+      .catch((error) => {
+        console.log('[AuthContext] Not authenticated:', error.response?.status || error.message);
         setUser(null);
       })
       .finally(() => {
+        console.log('[AuthContext] Auth check complete');
         setLoading(false);
       });
   }, []);
