@@ -20,6 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bull": "^4.16.5",
     "chromadb": "^3.1.2",
     "compression": "^1.7.4",
     "connect-pg-simple": "^9.0.1",
@@ -33,6 +34,8 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pdf-parse": "^1.1.1",
+    "pdf2json": "^4.0.0",
+    "pdfjs-dist": "^5.4.394",
     "pg": "^8.11.3",
     "pgvector": "^0.1.8",
     "uuid": "^9.0.1"

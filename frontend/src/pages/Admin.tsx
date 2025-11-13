@@ -101,8 +101,8 @@ export default function Admin() {
         setError('Please select a PDF file');
         return;
       }
-      if (file.size > 100 * 1024 * 1024) {
-        setError('File size must be less than 100MB');
+      if (file.size > 400 * 1024 * 1024) {
+        setError('File size must be less than 400MB');
         return;
       }
       setPdfFile(file);
@@ -154,17 +154,17 @@ export default function Admin() {
 
       if (response.data.success) {
         setSuccessMessage(
-          `Successfully processed "${title}" with ${response.data.chunksProcessed} chunks`
+          `Successfully uploaded "${title}". Processing in background...`
         );
         // Reset form
         setTitle('');
         setTopicInput('');
         setSelectedTopicId('');
         setPdfFile(null);
-        // Reload books
+        // Reload books to show the new book with 'pending' status
         await loadBooks();
       } else {
-        setError(response.data.error || 'Failed to process PDF');
+        setError(response.data.error || 'Failed to upload PDF');
       }
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -347,7 +347,6 @@ export default function Admin() {
                       <button
                         className="btn btn-danger btn-sm"
                         onClick={() => handleDelete(book.id, book.title)}
-                        disabled={book.processing_status === 'processing'}
                       >
                         Delete
                       </button>

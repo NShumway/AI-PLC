@@ -2,7 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAdmin } from '../middleware/auth';
 import pool from '../config/database';
-import { processPDF, deleteBook } from '../services/pdfProcessor';
+import { uploadPDF, deleteBook } from '../services/pdfProcessor';
+import { uploadAndProcessBook } from '../services/bookProcessorNew';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.use(requireAdmin);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 100 * 1024 * 1024 // 100MB limit
+    fileSize: 400 * 1024 * 1024 // 400MB limit (for large textbooks)
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
@@ -126,36 +127,28 @@ router.post('/books/upload', upload.single('pdf'), async (req, res) => {
     // Get user ID from session
     const userId = (req.user as any).id;
 
-    // Process the PDF
-    console.log(`Starting PDF processing: ${title} (${req.file.size} bytes)`);
+    // Upload the PDF and process it
+    console.log(`Uploading PDF: ${title} (${req.file.size} bytes)`);
 
-    const result = await processPDF({
-      title: title.trim(),
+    const { bookId, jobId } = await uploadAndProcessBook(
+      req.file.buffer,
+      title.trim(),
       topicId,
-      uploadedBy: userId,
-      buffer: req.file.buffer
-    });
+      userId
+    );
 
-    if (result.success) {
-      res.json({
-        success: true,
-        bookId: result.bookId,
-        chunksProcessed: result.chunksProcessed,
-        message: `Successfully processed PDF with ${result.chunksProcessed} chunks`
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        error: result.error || 'Failed to process PDF',
-        bookId: result.bookId
-      });
-    }
+    res.json({
+      success: true,
+      bookId,
+      jobId,
+      message: `PDF uploaded and processed successfully!`
+    });
   } catch (error) {
     console.error('Error uploading PDF:', error);
 
     if (error instanceof multer.MulterError) {
       if (error.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'File size exceeds 100MB limit' });
+        return res.status(413).json({ error: 'File size exceeds 400MB limit' });
       }
       return res.status(400).json({ error: error.message });
     }
@@ -186,14 +179,13 @@ router.delete('/books/:id', async (req, res) => {
 
     const book = bookResult.rows[0];
 
-    // Prevent deletion while processing
+    // Log a warning if deleting a processing book, but allow it
+    // (useful for stuck jobs or manual cleanup)
     if (book.processing_status === 'processing') {
-      return res.status(409).json({
-        error: 'Cannot delete book while processing is in progress'
-      });
+      console.warn(`Deleting book ${id} while in 'processing' status - background job may fail gracefully`);
     }
 
-    // Delete the book
+    // Delete the book (cascades to chunks, jobs, etc. via foreign keys)
     await deleteBook(id);
 
     res.json({ success: true, message: 'Book deleted successfully' });
