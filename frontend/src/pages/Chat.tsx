@@ -25,7 +25,7 @@ interface Message {
 export default function Chat() {
   const { user, logout } = useAuth();
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(undefined as any); // undefined means not yet initialized
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -46,11 +46,13 @@ export default function Chat() {
     loadTopics();
   }, []);
 
-  // Load messages when topic changes
+  // Load messages when selectedTopic is set (after topics are loaded)
   useEffect(() => {
-    if (selectedTopic !== null) {
+    // Only load messages after selectedTopic has been initialized (not undefined)
+    if (selectedTopic !== undefined) {
       loadMessages();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTopic]);
 
   const loadTopics = async () => {
