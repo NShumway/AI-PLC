@@ -20,7 +20,7 @@ This guide walks through deploying the AI-Powered PLC Coach to AWS with automate
 - **Database Name**: `plccoach`
 
 ### IAM & Networking
-- **GitHub Actions Role ARN**: `arn:aws:iam::971422717446:role/GitHubActionsDeployRole`
+- **GitHub Actions Role ARN**: `arn:aws:iam::971422717446:role/PLCCoachGitHubActionsRole`
 - **VPC Connector**: `plc-coach-vpc-connector`
 
 ## 🔑 Required GitHub Secrets
@@ -29,7 +29,7 @@ Add these at: https://github.com/NShumway/AI-PLC/settings/secrets/actions
 
 ```
 AWS_ROLE_ARN
-arn:aws:iam::971422717446:role/GitHubActionsDeployRole
+arn:aws:iam::971422717446:role/PLCCoachGitHubActionsRole
 
 APP_RUNNER_SERVICE_ARN
 arn:aws:apprunner:us-east-2:971422717446:service/plc-coach-backend/9a6e0dc55e2d43d6bb33dd20eacbd8d1
@@ -323,28 +323,28 @@ EOF
 
 # Create role
 aws iam create-role \
-  --role-name GitHubActionsDeployRole \
+  --role-name PLCCoachGitHubActionsRole \
   --assume-role-policy-document file:///tmp/github-trust-policy.json
 
 # Attach policies
 aws iam attach-role-policy \
-  --role-name GitHubActionsDeployRole \
+  --role-name PLCCoachGitHubActionsRole \
   --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
 
 aws iam attach-role-policy \
-  --role-name GitHubActionsDeployRole \
+  --role-name PLCCoachGitHubActionsRole \
   --policy-arn arn:aws:iam::aws:policy/AWSAppRunnerFullAccess
 
 aws iam attach-role-policy \
-  --role-name GitHubActionsDeployRole \
+  --role-name PLCCoachGitHubActionsRole \
   --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
 
 aws iam attach-role-policy \
-  --role-name GitHubActionsDeployRole \
+  --role-name PLCCoachGitHubActionsRole \
   --policy-arn arn:aws:iam::aws:policy/CloudFrontFullAccess
 
 # Get role ARN
-aws iam get-role --role-name GitHubActionsDeployRole --query 'Role.Arn' --output text
+aws iam get-role --role-name PLCCoachGitHubActionsRole --query 'Role.Arn' --output text
 ```
 
 ## Step 7: Create App Runner Service
@@ -400,7 +400,7 @@ CLOUDFRONT_ID="YOUR_CLOUDFRONT_DISTRIBUTION_ID"
 
 # Add GitHub secrets
 gh secret set AWS_ROLE_ARN \
-  --body "arn:aws:iam::${ACCOUNT_ID}:role/GitHubActionsDeployRole" \
+  --body "arn:aws:iam::${ACCOUNT_ID}:role/PLCCoachGitHubActionsRole" \
   --repo $GITHUB_REPO
 
 gh secret set APP_RUNNER_SERVICE_ARN \
@@ -526,11 +526,11 @@ cat > /tmp/trust-policy.json <<EOF
 }
 EOF
 
-aws iam create-role --role-name GitHubActionsDeployRole --assume-role-policy-document file:///tmp/trust-policy.json
-aws iam attach-role-policy --role-name GitHubActionsDeployRole --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
-aws iam attach-role-policy --role-name GitHubActionsDeployRole --policy-arn arn:aws:iam::aws:policy/AWSAppRunnerFullAccess
-aws iam attach-role-policy --role-name GitHubActionsDeployRole --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
-aws iam attach-role-policy --role-name GitHubActionsDeployRole --policy-arn arn:aws:iam::aws:policy/CloudFrontFullAccess
+aws iam create-role --role-name PLCCoachGitHubActionsRole --assume-role-policy-document file:///tmp/trust-policy.json
+aws iam attach-role-policy --role-name PLCCoachGitHubActionsRole --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
+aws iam attach-role-policy --role-name PLCCoachGitHubActionsRole --policy-arn arn:aws:iam::aws:policy/AWSAppRunnerFullAccess
+aws iam attach-role-policy --role-name PLCCoachGitHubActionsRole --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
+aws iam attach-role-policy --role-name PLCCoachGitHubActionsRole --policy-arn arn:aws:iam::aws:policy/CloudFrontFullAccess
 
 echo "✅ Setup complete!"
 echo ""
