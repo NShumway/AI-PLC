@@ -31,14 +31,24 @@ const PgSession = connectPgSimple(session);
 // Middleware
 app.use(helmet());
 app.use(compression());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase body size limits for file uploads (500MB for JSON, though multer handles the actual file)
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
 // CORS configuration
-app.use(cors({
+const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400 // 24 hours
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
 
 // Session configuration
 app.use(session({
