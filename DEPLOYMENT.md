@@ -389,7 +389,8 @@ aws iam create-open-id-connect-provider \
   --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
 
 # Create trust policy
-GITHUB_REPO="YourUsername/YourRepo"
+# ⚠️  IMPORTANT: This repo is NShumway/AI-PLC - DO NOT change this!
+GITHUB_REPO="NShumway/AI-PLC"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 cat > /tmp/github-trust-policy.json <<EOF
