@@ -6,7 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 // Configure axios defaults
 axios.defaults.baseURL = API_URL;
 axios.defaults.withCredentials = true;
-axios.defaults.timeout = 10000; // 10 second timeout
+axios.defaults.timeout = 600000; // 10 minute timeout (for large PDF uploads)
 
 // Add request/response interceptors for debugging
 axios.interceptors.request.use(

@@ -4,9 +4,9 @@
   "description": "AI-Powered PLC Coach Backend API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon src/index.ts",
+    "dev": "NODE_OPTIONS='--max-old-space-size=4096' nodemon src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --max-old-space-size=4096 dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -51,6 +51,7 @@
     "@types/pdf-parse": "^1.1.4",
     "@types/pg": "^8.11.0",
     "@types/supertest": "^6.0.3",
+    "@types/uuid": "^10.0.0",
     "jest": "^30.2.0",
     "nodemon": "^3.0.3",
     "supertest": "^7.1.4",
