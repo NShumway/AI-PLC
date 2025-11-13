@@ -149,11 +149,8 @@ export default function Admin() {
       formData.append('title', title.trim());
       formData.append('topicId', topicId);
 
-      const response = await api.post('/api/admin/books/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      // Don't set Content-Type manually - let axios set it with the correct boundary
+      const response = await api.post('/api/admin/books/upload', formData);
 
       if (response.data.success) {
         setSuccessMessage(
