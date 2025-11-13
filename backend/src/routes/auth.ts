@@ -12,8 +12,16 @@ router.get('/google', passport.authenticate('google', {
 router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    // Successful authentication, redirect to frontend
-    res.redirect(process.env.FRONTEND_URL || 'http://localhost:3000');
+    // Save session before redirecting
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).send('Authentication failed');
+      }
+      console.log('✓ Session saved, redirecting to frontend');
+      // Successful authentication, redirect to frontend
+      res.redirect(process.env.FRONTEND_URL || 'http://localhost:3000');
+    });
   }
 );
 
