@@ -1,6 +1,5 @@
 // Mock environment variables before imports
 process.env.OPENAI_API_KEY = 'test-key';
-process.env.CHROMA_URL = 'http://localhost:8000';
 
 // Mock OpenAI
 const mockChatCreate = jest.fn();
@@ -115,7 +114,7 @@ describe('RAG Service', () => {
       const result = await processQuery('What is a PLC?');
 
       expect(result.hasRelevantDocs).toBe(false);
-      expect(result.answer).toContain("couldn't find any relevant information");
+      expect(result.answer).toContain("don't have information in my knowledge base");
     });
 
     it('should include citations when relevant documents are found', async () => {

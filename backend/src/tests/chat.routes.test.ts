@@ -1,6 +1,5 @@
 // Mock environment variables
 process.env.OPENAI_API_KEY = 'test-key';
-process.env.CHROMA_URL = 'http://localhost:8000';
 
 import request from 'supertest';
 import express from 'express';

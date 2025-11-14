@@ -1,15 +1,10 @@
-import { ChromaClient } from 'chromadb';
 import OpenAI from 'openai';
-
-const client = new ChromaClient({
-  path: process.env.CHROMA_URL || 'http://localhost:8000'
-});
+import pool from '../config/database';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const COLLECTION_NAME = 'plc_documents';
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 
 interface SearchResult {
@@ -25,27 +20,6 @@ interface SearchResult {
 }
 
 /**
- * Initialize or get the ChromaDB collection
- */
-export async function getCollection() {
-  try {
-    // Try to get existing collection
-    const collection = await client.getCollection({
-      name: COLLECTION_NAME
-    });
-    return collection;
-  } catch (error) {
-    // Collection doesn't exist, create it
-    console.log('Creating new ChromaDB collection:', COLLECTION_NAME);
-    const collection = await client.createCollection({
-      name: COLLECTION_NAME,
-      metadata: { description: 'PLC course documents and books' }
-    });
-    return collection;
-  }
-}
-
-/**
  * Generate embeddings for a text using OpenAI
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
@@ -58,7 +32,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Search for relevant documents in the vector database
+ * Search for relevant documents in the vector database using pgvector
+ * Uses cosine distance for similarity search
  */
 export async function searchSimilarDocuments(
   query: string,
@@ -66,32 +41,51 @@ export async function searchSimilarDocuments(
   topK: number = 5
 ): Promise<SearchResult[]> {
   try {
-    const collection = await getCollection();
-
     // Generate embedding for the query
     const queryEmbedding = await generateEmbedding(query);
 
-    // Build filter for topic if specified
-    const whereFilter = topicId ? { topic_id: topicId } : undefined;
+    // Convert embedding array to PostgreSQL vector format
+    const embeddingString = `[${queryEmbedding.join(',')}]`;
 
-    // Search in ChromaDB
-    const results = await collection.query({
-      queryEmbeddings: [queryEmbedding],
-      nResults: topK,
-      where: whereFilter
-    });
+    // Build query with optional topic filter
+    let queryText = `
+      SELECT
+        id::text,
+        text,
+        book_title,
+        page_number,
+        book_id::text,
+        topic_id::text,
+        embedding <=> $1::vector as distance
+      FROM document_chunks
+    `;
 
-    // Check if we got any results
-    if (!results.ids || !results.ids[0] || results.ids[0].length === 0) {
-      return [];
+    const queryParams: any[] = [embeddingString];
+
+    if (topicId) {
+      queryText += ` WHERE topic_id = $2`;
+      queryParams.push(topicId);
     }
 
+    queryText += `
+      ORDER BY embedding <=> $1::vector
+      LIMIT $${queryParams.length + 1}
+    `;
+    queryParams.push(topK);
+
+    const result = await pool.query(queryText, queryParams);
+
     // Transform results to our format
-    const searchResults: SearchResult[] = results.ids[0].map((id, index) => ({
-      id: id as string,
-      text: results.documents?.[0]?.[index] as string || '',
-      metadata: results.metadatas?.[0]?.[index] as any || {},
-      distance: results.distances?.[0]?.[index] as number || 1.0
+    const searchResults: SearchResult[] = result.rows.map(row => ({
+      id: row.id,
+      text: row.text,
+      metadata: {
+        book_title: row.book_title,
+        page_number: row.page_number,
+        book_id: row.book_id,
+        topic_id: row.topic_id
+      },
+      distance: parseFloat(row.distance)
     }));
 
     return searchResults;
@@ -103,6 +97,8 @@ export async function searchSimilarDocuments(
 
 /**
  * Add a document chunk to the vector database
+ * Note: This function is kept for API compatibility but in the new architecture,
+ * chunks are added directly via bookProcessorNew.ts during PDF processing
  */
 export async function addDocumentChunk(
   id: string,
@@ -115,15 +111,19 @@ export async function addDocumentChunk(
   }
 ): Promise<void> {
   try {
-    const collection = await getCollection();
     const embedding = await generateEmbedding(text);
+    const embeddingString = `[${embedding.join(',')}]`;
 
-    await collection.add({
-      ids: [id],
-      embeddings: [embedding],
-      documents: [text],
-      metadatas: [metadata]
-    });
+    await pool.query(
+      `INSERT INTO document_chunks (id, book_id, topic_id, text, embedding, page_number, book_title, chunk_index)
+       VALUES ($1, $2, $3, $4, $5::vector, $6, $7, 0)
+       ON CONFLICT (id) DO UPDATE SET
+         text = EXCLUDED.text,
+         embedding = EXCLUDED.embedding,
+         page_number = EXCLUDED.page_number,
+         book_title = EXCLUDED.book_title`,
+      [id, metadata.book_id, metadata.topic_id, text, embeddingString, metadata.page_number, metadata.book_title]
+    );
 
     console.log(`Added document chunk ${id} to vector database`);
   } catch (error) {
@@ -137,9 +137,8 @@ export async function addDocumentChunk(
  */
 export async function hasDocuments(): Promise<boolean> {
   try {
-    const collection = await getCollection();
-    const count = await collection.count();
-    return count > 0;
+    const result = await pool.query('SELECT COUNT(*) as count FROM document_chunks');
+    return parseInt(result.rows[0].count) > 0;
   } catch (error) {
     console.error('Error checking document count:', error);
     return false;
@@ -151,8 +150,8 @@ export async function hasDocuments(): Promise<boolean> {
  */
 export async function getDocumentCount(): Promise<number> {
   try {
-    const collection = await getCollection();
-    return await collection.count();
+    const result = await pool.query('SELECT COUNT(*) as count FROM document_chunks');
+    return parseInt(result.rows[0].count);
   } catch (error) {
     console.error('Error getting document count:', error);
     return 0;

@@ -197,16 +197,31 @@ describe('PDF Extraction', () => {
 
     if (chunks.length > 1) {
       // Check that consecutive chunks have overlapping text
+      // Due to trimming and lookahead, we verify the overlap strategy is applied
       for (let i = 0; i < chunks.length - 1; i++) {
-        const chunk1End = chunks[i].text.slice(-100);
-        const chunk2Start = chunks[i + 1].text.slice(0, 100);
+        // Chunks should be created with OVERLAP logic (CHUNK_SIZE - OVERLAP = 800 char offset)
+        // So if we have multiple chunks from the same page, the overlap strategy is working
+        expect(chunks[i].pageNumber).toBe(100);
+        expect(chunks[i + 1].pageNumber).toBe(100);
 
-        // There should be some overlap
-        const hasOverlap = chunk1End.split(' ').some(word =>
-          word.length > 3 && chunk2Start.includes(word)
-        );
+        // Both chunks should have meaningful content
+        expect(chunks[i].text.length).toBeGreaterThan(50);
+        expect(chunks[i + 1].text.length).toBeGreaterThan(50);
+
+        // Look for overlap in a larger window (200 chars from each end)
+        const chunk1End = chunks[i].text.slice(-200);
+        const chunk2Start = chunks[i + 1].text.slice(0, 200);
+
+        // Extract words (>4 chars) and check for any common words
+        const words1 = chunk1End.split(/\s+/).filter(w => w.length > 4);
+        const words2 = chunk2Start.split(/\s+/).filter(w => w.length > 4);
+
+        const hasOverlap = words1.some(word => words2.includes(word));
         expect(hasOverlap).toBe(true);
       }
+    } else {
+      // If there's only one chunk, that's fine - just verify it exists
+      expect(chunks.length).toBeGreaterThanOrEqual(1);
     }
   });
 

@@ -1,20 +1,16 @@
 // Mock environment variables before imports
 process.env.OPENAI_API_KEY = 'test-key';
-process.env.CHROMA_URL = 'http://localhost:8000';
+process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 
 // Mock dependencies
 const mockQuery = jest.fn();
-const mockAdd = jest.fn();
-const mockCount = jest.fn();
-const mockGetCollection = jest.fn();
-const mockCreateCollection = jest.fn();
 const mockEmbeddingsCreate = jest.fn();
 
-jest.mock('chromadb', () => ({
-  ChromaClient: jest.fn().mockImplementation(() => ({
-    getCollection: mockGetCollection,
-    createCollection: mockCreateCollection
-  }))
+jest.mock('../config/database', () => ({
+  __esModule: true,
+  default: {
+    query: mockQuery
+  }
 }));
 
 jest.mock('openai', () => {
@@ -26,7 +22,6 @@ jest.mock('openai', () => {
 });
 
 import {
-  getCollection,
   generateEmbedding,
   searchSimilarDocuments,
   addDocumentChunk,
@@ -37,33 +32,6 @@ import {
 describe('Vector Search Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  describe('getCollection', () => {
-    it('should return existing collection if it exists', async () => {
-      const mockCollection = { name: 'plc_documents' };
-      mockGetCollection.mockResolvedValue(mockCollection);
-
-      const result = await getCollection();
-
-      expect(result).toBe(mockCollection);
-      expect(mockGetCollection).toHaveBeenCalledWith({ name: 'plc_documents' });
-      expect(mockCreateCollection).not.toHaveBeenCalled();
-    });
-
-    it('should create collection if it does not exist', async () => {
-      const mockCollection = { name: 'plc_documents' };
-      mockGetCollection.mockRejectedValue(new Error('Collection not found'));
-      mockCreateCollection.mockResolvedValue(mockCollection);
-
-      const result = await getCollection();
-
-      expect(result).toBe(mockCollection);
-      expect(mockCreateCollection).toHaveBeenCalledWith({
-        name: 'plc_documents',
-        metadata: { description: 'PLC course documents and books' }
-      });
-    });
   });
 
   describe('generateEmbedding', () => {
@@ -99,23 +67,33 @@ describe('Vector Search Service', () => {
 
   describe('searchSimilarDocuments', () => {
     beforeEach(() => {
-      mockGetCollection.mockResolvedValue({
-        query: mockQuery
-      });
       mockEmbeddingsCreate.mockResolvedValue({
         data: [{ embedding: new Array(1536).fill(0.1) }]
       });
     });
 
-    it('should search for similar documents with query embedding', async () => {
+    it('should search for similar documents using pgvector', async () => {
       mockQuery.mockResolvedValue({
-        ids: [['doc1', 'doc2']],
-        documents: [['Text 1', 'Text 2']],
-        metadatas: [[
-          { book_title: 'Book 1', page_number: 5, book_id: 'b1', topic_id: 't1' },
-          { book_title: 'Book 2', page_number: 10, book_id: 'b2', topic_id: 't1' }
-        ]],
-        distances: [[0.3, 0.4]]
+        rows: [
+          {
+            id: 'doc1',
+            text: 'Text 1',
+            book_title: 'Book 1',
+            page_number: 5,
+            book_id: 'b1',
+            topic_id: 't1',
+            distance: '0.3'
+          },
+          {
+            id: 'doc2',
+            text: 'Text 2',
+            book_title: 'Book 2',
+            page_number: 10,
+            book_id: 'b2',
+            topic_id: 't1',
+            distance: '0.4'
+          }
+        ]
       });
 
       const results = await searchSimilarDocuments('What is a PLC?');
@@ -132,27 +110,29 @@ describe('Vector Search Service', () => {
 
     it('should filter by topic when provided', async () => {
       mockQuery.mockResolvedValue({
-        ids: [['doc1']],
-        documents: [['Text 1']],
-        metadatas: [[{ book_title: 'Book 1', page_number: 5, book_id: 'b1', topic_id: 'topic1' }]],
-        distances: [[0.3]]
+        rows: [
+          {
+            id: 'doc1',
+            text: 'Text 1',
+            book_title: 'Book 1',
+            page_number: 5,
+            book_id: 'b1',
+            topic_id: 'topic1',
+            distance: '0.3'
+          }
+        ]
       });
 
       await searchSimilarDocuments('What is a PLC?', 'topic1');
 
-      expect(mockQuery).toHaveBeenCalledWith({
-        queryEmbeddings: expect.any(Array),
-        nResults: 5,
-        where: { topic_id: 'topic1' }
-      });
+      const queryCall = mockQuery.mock.calls[0];
+      expect(queryCall[0]).toContain('WHERE topic_id = $2');
+      expect(queryCall[1]).toContain('topic1');
     });
 
     it('should return empty array when no results found', async () => {
       mockQuery.mockResolvedValue({
-        ids: [[]],
-        documents: [[]],
-        metadatas: [[]],
-        distances: [[]]
+        rows: []
       });
 
       const results = await searchSimilarDocuments('What is a PLC?');
@@ -162,33 +142,25 @@ describe('Vector Search Service', () => {
 
     it('should respect topK parameter', async () => {
       mockQuery.mockResolvedValue({
-        ids: [[]],
-        documents: [[]],
-        metadatas: [[]],
-        distances: [[]]
+        rows: []
       });
 
       await searchSimilarDocuments('What is a PLC?', undefined, 10);
 
-      expect(mockQuery).toHaveBeenCalledWith({
-        queryEmbeddings: expect.any(Array),
-        nResults: 10,
-        where: undefined
-      });
+      const queryCall = mockQuery.mock.calls[0];
+      expect(queryCall[1][queryCall[1].length - 1]).toBe(10);
     });
   });
 
   describe('addDocumentChunk', () => {
     beforeEach(() => {
-      mockGetCollection.mockResolvedValue({
-        add: mockAdd
-      });
       mockEmbeddingsCreate.mockResolvedValue({
         data: [{ embedding: new Array(1536).fill(0.1) }]
       });
+      mockQuery.mockResolvedValue({ rows: [] });
     });
 
-    it('should add document chunk with generated embedding', async () => {
+    it('should add document chunk with generated embedding to PostgreSQL', async () => {
       const metadata = {
         book_title: 'PLC Basics',
         page_number: 5,
@@ -198,34 +170,31 @@ describe('Vector Search Service', () => {
 
       await addDocumentChunk('chunk1', 'Sample text', metadata);
 
-      expect(mockAdd).toHaveBeenCalledWith({
-        ids: ['chunk1'],
-        embeddings: [expect.any(Array)],
-        documents: ['Sample text'],
-        metadatas: [metadata]
-      });
+      expect(mockQuery).toHaveBeenCalled();
+      const queryCall = mockQuery.mock.calls[0];
+      expect(queryCall[0]).toContain('INSERT INTO document_chunks');
+      expect(queryCall[1]).toContain('chunk1');
+      expect(queryCall[1]).toContain('Sample text');
       expect(mockEmbeddingsCreate).toHaveBeenCalled();
     });
   });
 
   describe('hasDocuments', () => {
     it('should return true when documents exist', async () => {
-      mockGetCollection.mockResolvedValue({
-        count: mockCount
+      mockQuery.mockResolvedValue({
+        rows: [{ count: '10' }]
       });
-      mockCount.mockResolvedValue(10);
 
       const result = await hasDocuments();
 
       expect(result).toBe(true);
-      expect(mockCount).toHaveBeenCalled();
+      expect(mockQuery).toHaveBeenCalledWith('SELECT COUNT(*) as count FROM document_chunks');
     });
 
     it('should return false when no documents exist', async () => {
-      mockGetCollection.mockResolvedValue({
-        count: mockCount
+      mockQuery.mockResolvedValue({
+        rows: [{ count: '0' }]
       });
-      mockCount.mockResolvedValue(0);
 
       const result = await hasDocuments();
 
@@ -233,7 +202,7 @@ describe('Vector Search Service', () => {
     });
 
     it('should return false on error', async () => {
-      mockGetCollection.mockRejectedValue(new Error('Database error'));
+      mockQuery.mockRejectedValue(new Error('Database error'));
 
       const result = await hasDocuments();
 
@@ -243,10 +212,9 @@ describe('Vector Search Service', () => {
 
   describe('getDocumentCount', () => {
     it('should return the count of documents', async () => {
-      mockGetCollection.mockResolvedValue({
-        count: mockCount
+      mockQuery.mockResolvedValue({
+        rows: [{ count: '42' }]
       });
-      mockCount.mockResolvedValue(42);
 
       const result = await getDocumentCount();
 
@@ -254,7 +222,7 @@ describe('Vector Search Service', () => {
     });
 
     it('should return 0 on error', async () => {
-      mockGetCollection.mockRejectedValue(new Error('Database error'));
+      mockQuery.mockRejectedValue(new Error('Database error'));
 
       const result = await getDocumentCount();
 

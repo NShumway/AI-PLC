@@ -16,9 +16,9 @@ describe('Database Staging and Atomic Commits', () => {
 
     // Create test user
     const userResult = await pool.query(
-      `INSERT INTO users (id, email, name, is_admin)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [uuidv4(), 'test@example.com', 'Test User', false]
+      `INSERT INTO users (id, google_id, email, name, role)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [uuidv4(), 'test-google-id-123', 'test@example.com', 'Test User', 'educator']
     );
     testUserId = userResult.rows[0].id;
   });

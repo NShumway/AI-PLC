@@ -4,7 +4,7 @@
 Phase 3 implements a complete PDF upload and management system for admin users, including:
 - PDF upload with metadata (title, topic)
 - Synchronous text extraction and chunking
-- Embedding generation and storage in PostgreSQL + ChromaDB
+- Embedding generation and storage in PostgreSQL with pgvector
 - Admin dashboard for managing books and topics
 - Topic autocomplete with create-new capability
 - Book deletion with cascade cleanup
@@ -25,8 +25,7 @@ Phase 3 implements a complete PDF upload and management system for admin users, 
   1. Extract text from PDF page-by-page
   2. Chunk text with overlap
   3. Generate embeddings via OpenAI
-  4. Store in PostgreSQL `document_chunks` table
-  5. Store in ChromaDB collection
+  4. Store in PostgreSQL `document_chunks` table with pgvector
 - **Error handling:** Failed books stored with error message
 - **Images:** Automatically skipped (pdf-parse extracts text only)
 - **File size limit:** 100MB
@@ -51,7 +50,7 @@ Phase 3 implements a complete PDF upload and management system for admin users, 
 
 **DELETE /api/admin/books/:id**
 - Prevents deletion during processing
-- Cascades delete from PostgreSQL and ChromaDB
+- Cascades delete from PostgreSQL
 - Removes all document chunks
 
 ### Frontend Components
@@ -132,9 +131,8 @@ CREATE INDEX idx_books_processing_status ON books(processing_status);
 ## Testing
 
 ### Prerequisites
-1. Local PostgreSQL database running
-2. ChromaDB running (`docker run -p 8000:8000 chromadb/chroma`)
-3. `.env` file configured with:
+1. Local PostgreSQL database running with pgvector extension installed
+2. `.env` file configured with:
    - `DATABASE_URL`
    - `OPENAI_API_KEY`
    - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
@@ -167,7 +165,7 @@ npm run dev
    - Verify processing status updates
    - Check books table for new entry
    - Test deletion
-   - Verify chunks in database and ChromaDB
+   - Verify chunks in database
 
 5. **Verify data:**
 ```sql
@@ -177,8 +175,8 @@ SELECT * FROM books ORDER BY created_at DESC LIMIT 1;
 -- Check chunks were created
 SELECT COUNT(*) FROM document_chunks WHERE book_id = 'your-book-id';
 
--- Check ChromaDB
-curl http://localhost:8000/api/v1/collections/plc_documents
+-- Verify embeddings are stored
+SELECT id, book_title, page_number FROM document_chunks LIMIT 5;
 ```
 
 ## Architecture Decisions
@@ -191,13 +189,15 @@ curl http://localhost:8000/api/v1/collections/plc_documents
 - Most textbooks process in <30 seconds
 - Can upgrade to async later if needed
 
-### Dual Storage (PostgreSQL + ChromaDB)
-**Choice:** Keep both synced
+### Vector Storage with pgvector
+**Choice:** PostgreSQL with pgvector extension
 **Rationale:**
-- PostgreSQL for relational queries and data integrity
-- ChromaDB for fast vector similarity search
+- Single database for both relational and vector data
+- Eliminates synchronization complexity
+- PostgreSQL's HNSW index provides fast similarity search
 - Easier debugging with SQL queries
-- Can analyze chunks and usage patterns
+- Simpler deployment (no separate ChromaDB service)
+- Can analyze chunks and usage patterns with SQL
 
 ### Topic Management
 **Choice:** Autocomplete text input (not dropdown)
@@ -258,9 +258,9 @@ curl http://localhost:8000/api/v1/collections/plc_documents
 
 ### Backend
 - [ ] Run database migration on production
+- [ ] Verify pgvector extension is installed
 - [ ] Build backend: `npm run build`
 - [ ] Verify environment variables in production
-- [ ] Ensure ChromaDB is accessible
 - [ ] Test upload with small PDF
 
 ### Frontend
@@ -279,6 +279,6 @@ curl http://localhost:8000/api/v1/collections/plc_documents
 For issues or questions:
 1. Check logs: `docker logs <container>` or CloudWatch
 2. Verify environment variables
-3. Test ChromaDB connection
+3. Verify pgvector extension is installed: `SELECT * FROM pg_extension WHERE extname = 'vector';`
 4. Check database migration status
 5. Review error messages in books table

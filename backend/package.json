@@ -21,7 +21,6 @@
   "license": "ISC",
   "dependencies": {
     "bull": "^4.16.5",
-    "chromadb": "^3.1.2",
     "compression": "^1.7.4",
     "connect-pg-simple": "^9.0.1",
     "cors": "^2.8.5",

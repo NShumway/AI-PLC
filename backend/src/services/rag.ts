@@ -5,6 +5,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// Cosine distance threshold: 0 = identical, 2 = opposite
+// Typical values: 0.0-0.3 = highly relevant, 0.3-0.5 = somewhat relevant, 0.5+ = less relevant
 const SIMILARITY_THRESHOLD = parseFloat(process.env.SIMILARITY_THRESHOLD || '0.5');
 
 interface Citation {
