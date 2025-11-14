@@ -50,13 +50,15 @@ Build an AI-powered chatbot that helps educators in Professional Learning Commun
 **Input**: PDF file + metadata (title - required, TOPIC - required)
 
 **Process**:
-1. Receive PDF upload (process in memory, do NOT store file)
-2. Extract text from PDF (use library like `pdf-parse` or `pdfjs`)
+1. Receive PDF upload (up to 400MB limit)
+2. Extract text from PDF (using `pdftotext` command-line tool from poppler-utils)
 3. Handle OCR if needed (though assume text-based PDFs for MVP)
 4. Chunk text:
-   - **Strategy**: Recursive character text splitting (industry standard)
-   - **Chunk size**: ~1000 tokens with ~200 token overlap
+   - **Strategy**: Recursive character text splitting with lookahead across page boundaries
+   - **Chunk size**: 1000 characters with 200 character overlap
+   - **Lookahead**: 2000 characters across page boundaries to preserve context
    - **Preserve page numbers**: Track page number for each chunk during extraction
+5. Process asynchronously with 3 parallel workers for performance
 5. Generate embeddings for each chunk (OpenAI `text-embedding-3-small`)
 6. Store in vector DB with metadata:
    ```json

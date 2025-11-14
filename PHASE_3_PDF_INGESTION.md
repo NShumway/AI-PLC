@@ -50,17 +50,18 @@ interface TextChunk {
 }
 
 /**
- * Simple character-based text splitter
- * Splits on ~1000 tokens with 200 token overlap
- * Rough estimate: 1 token ≈ 4 characters, so:
- * - Chunk size: ~4000 characters
- * - Overlap: ~800 characters
+ * Character-based text splitter
+ * Implementation uses:
+ * - Chunk size: 1000 characters
+ * - Overlap: 200 characters
+ * NOTE: Actual implementation in bookProcessorNew.ts uses advanced
+ * lookahead chunking to preserve context across page boundaries
  */
 export function chunkText(
   text: string,
   pageNumber: number,
-  chunkSize: number = 4000,
-  overlap: number = 800
+  chunkSize: number = 1000,
+  overlap: number = 200
 ): TextChunk[] {
   const chunks: TextChunk[] = [];
   let startIndex = 0;
