@@ -256,6 +256,7 @@ export default function Admin() {
                 onBlur={() => setTimeout(() => setShowTopicSuggestions(false), 200)}
                 placeholder="Select existing or create new topic"
                 disabled={uploading}
+                autoComplete="off"
                 required
               />
               {showTopicSuggestions && filteredTopics.length > 0 && (
