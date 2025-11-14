@@ -48,7 +48,7 @@ export async function processQuery(
 
     if (relevantDocs.length === 0) {
       return {
-        answer: "I apologize, but I couldn't find any relevant information in my knowledge base to answer your question. I can only provide answers based on the PLC course materials that have been uploaded. Please try rephrasing your question or ask about a different topic covered in the materials.",
+        answer: "I apologize, but I don't have information in my knowledge base that answers your question. Please try rephrasing your question or ask about a different topic covered in the materials.",
         citations: [],
         hasRelevantDocs: false
       };

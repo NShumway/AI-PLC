@@ -2,8 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAdmin } from '../middleware/auth';
 import pool from '../config/database';
-import { uploadPDF, deleteBook } from '../services/pdfProcessor';
-import { uploadAndProcessBook } from '../services/bookProcessorNew';
+import { uploadAndProcessBook, deleteBook } from '../services/bookProcessorNew';
 
 const router = Router();
 

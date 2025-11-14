@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import pool from '../config/database';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
+import { getCollection } from './vectorSearch';
 
 const execFileAsync = promisify(execFile);
 
@@ -460,6 +461,59 @@ async function commitToProduction(
 
     await client.query('COMMIT');
 
+    console.log('✓ Committed to PostgreSQL. Adding to ChromaDB...');
+
+    // Add all chunks to ChromaDB
+    try {
+      const collection = await getCollection();
+
+      // Fetch all chunks for this book
+      const chunksResult = await pool.query(
+        `SELECT id, book_id, topic_id, text, embedding, page_number, book_title
+         FROM document_chunks
+         WHERE book_id = $1`,
+        [bookId]
+      );
+
+      const chunks = chunksResult.rows;
+      console.log(`Adding ${chunks.length} chunks to ChromaDB...`);
+
+      // Add to ChromaDB in batches of 100
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+        const batch = chunks.slice(i, i + BATCH_SIZE);
+
+        const ids = batch.map(c => c.id);
+        const embeddings = batch.map(c => {
+          // Parse embedding from PostgreSQL array format
+          const embeddingStr = c.embedding.replace('[', '').replace(']', '');
+          return embeddingStr.split(',').map((v: string) => parseFloat(v));
+        });
+        const documents = batch.map(c => c.text);
+        const metadatas = batch.map(c => ({
+          book_id: c.book_id,
+          topic_id: c.topic_id,
+          page_number: c.page_number,
+          book_title: c.book_title
+        }));
+
+        await collection.add({
+          ids,
+          embeddings,
+          documents,
+          metadatas
+        });
+
+        console.log(`  Added batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}`);
+      }
+
+      console.log(`✓ Added ${chunks.length} chunks to ChromaDB`);
+    } catch (chromaError) {
+      console.error('Error adding to ChromaDB:', chromaError);
+      // Don't fail the whole operation if ChromaDB fails
+      console.warn('WARNING: Chunks were saved to PostgreSQL but not ChromaDB');
+    }
+
     console.log('✓ Book processing complete!');
 
     // Cleanup PDF file
@@ -470,6 +524,46 @@ async function commitToProduction(
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Commit failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Delete a book and all its chunks from both databases
+ */
+export async function deleteBook(bookId: string): Promise<void> {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Get all chunk IDs for this book (needed for ChromaDB deletion)
+    const chunkResult = await client.query(
+      'SELECT id FROM document_chunks WHERE book_id = $1',
+      [bookId]
+    );
+
+    const chunkIds = chunkResult.rows.map((row: any) => row.id);
+
+    // Delete from PostgreSQL (cascades to document_chunks via FK)
+    await client.query('DELETE FROM document_chunks WHERE book_id = $1', [bookId]);
+    await client.query('DELETE FROM books WHERE id = $1', [bookId]);
+
+    await client.query('COMMIT');
+
+    // Delete from ChromaDB
+    if (chunkIds.length > 0) {
+      const collection = await getCollection();
+      await collection.delete({ ids: chunkIds });
+      console.log(`Deleted ${chunkIds.length} chunks from ChromaDB`);
+    }
+
+    console.log(`Successfully deleted book ${bookId}`);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting book:', error);
     throw error;
   } finally {
     client.release();
